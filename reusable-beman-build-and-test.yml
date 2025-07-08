@@ -66,6 +66,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
       - name: Setup MSVC
         if: matrix.config.compiler == 'msvc'
         uses: TheMrMilchmann/setup-msvc-dev@v3
