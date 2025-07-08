@@ -155,7 +155,7 @@ jobs:
         run: |
           cat > gcovr.cfg <<EOF
           root = $GITHUB_WORKSPACE
-          gcov-executable = gcov-${{ matrix.config.version }}
+          gcov-executable = gcov
           exclude = $GITHUB_WORKSPACE/build/.*
           exclude = $GITHUB_WORKSPACE/examples/.*
           exclude = $GITHUB_WORKSPACE/tests/.*
