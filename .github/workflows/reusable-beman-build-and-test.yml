@@ -150,7 +150,7 @@ jobs:
         shell: bash
         run: ctest --test-dir build --build-config ${{ steps.vars.outputs.build_config }} --output-on-failure
       - name: Generate Coverage Files
-        if: steps.vars.outputs.test_type == 'Coverage'
+        if: steps.vars.outputs.test_type == 'Coverage' && github.event_name != 'schedule'
         shell: bash
         run: |
           cat > gcovr.cfg <<EOF
@@ -167,7 +167,7 @@ jobs:
           gcovr --verbose --config gcovr.cfg .
           cat coverage.json
       - name: Upload Coverage Data to Coveralls
-        if: steps.vars.outputs.test_type == 'Coverage'
+        if: steps.vars.outputs.test_type == 'Coverage' && github.event_name != 'schedule'
         uses: coverallsapp/github-action@main
         with:
           file: coverage.json
