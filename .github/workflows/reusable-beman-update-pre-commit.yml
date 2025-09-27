@@ -4,12 +4,22 @@ name: Pre-commit auto-update
 
 on:
   workflow_call:
-
+    secrets:
+      APP_ID:
+        required: true
+      PRIVATE_KEY:
+        required: true
 jobs:
   auto-update:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Generate a token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -18,10 +28,18 @@ jobs:
         run: pip install pre-commit
       - name: Run pre-commit autoupdate
         run: pre-commit autoupdate
+      - name: Apply updated hooks to all files
+        run: pre-commit run --all-files
+        continue-on-error: true
+      - name: Sync cookiecutter if exemplar
+        run: |
+          if [[ -d "cookiecutter" ]]; then
+            cp .pre-commit-config.yaml 'cookiecutter/{{cookiecutter.project_name}}/.pre-commit-config.yaml'
+          fi
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.generate_token.outputs.token }}
           branch: update/pre-commit-autoupdate
           title: Auto-update pre-commit hooks
           commit-message: Auto-update pre-commit hooks
