@@ -70,6 +70,6 @@ jobs:
         }
         EOF
 
-        cmake -B build -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/dist
+        cmake -B build -DCMAKE_CXX_STANDARD=${{ inputs.cxx_standard }} -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/dist
 
         cmake --build build
