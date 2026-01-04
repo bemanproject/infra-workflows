@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Test CMake Install
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: 'Image to build and install the library under'
+        type: string
+        required: true
+      cxx_standard:
+        description: 'C++ standard version to build the library with'
+        type: string
+        required: true
+      main_header:
+        description: 'Name of the main header of the project'
+        type: string
+        required: false
+
+jobs:
+  test-install:
+    runs-on: ubuntu-latest
+    container: ${{ inputs.image }}
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Configure CMake (Library)
+      run:  |
+        mkdir -p build/.cmake/api/v1/query
+        touch build/.cmake/api/v1/query/codemodel-v2
+        cmake -B build -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=./infra/cmake/use-fetch-content.cmake -DCMAKE_CXX_STANDARD=${{ inputs.cxx_standard }} -DCMAKE_INSTALL_PREFIX=$PWD/dist
+
+    - name: Get Library Name
+      id: get-lib-name
+      run: |
+        PROJECT_NAME=$(cat build/.cmake/api/v1/reply/codemodel-v2-*.json | jq -r '.configurations[0].projects[0].name')
+        echo "name=${PROJECT_NAME#beman.}" >> "$GITHUB_OUTPUT"
+
+    - name: Build Library
+      run: cmake --build build
+
+    - name: Install Library
+      run: cmake --install build
+
+    - name: Verify Installation (Consumer Test)
+      run: |
+        mkdir consumer && cd consumer
+        cat <<EOF > CMakeLists.txt
+        cmake_minimum_required(VERSION 3.28)
+        project(ConsumerTest LANGUAGES CXX)
+
+        find_package(beman.${{ steps.get-lib-name.outputs.name }} REQUIRED)
+
+        add_executable(app main.cpp)
+
+        target_link_libraries(app PRIVATE beman::${{ steps.get-lib-name.outputs.name }})
+        EOF
+
+        main_header=${{ inputs.main_header }}
+        if [[ -z "$main_header" ]] ; then
+          main_header="${{ steps.get-lib-name.outputs.name }}.hpp"
+        fi
+
+        cat <<EOF > main.cpp
+        #include <beman/${{ steps.get-lib-name.outputs.name }}/${main_header}>
+
+        int main() {
+            return 0;
+        }
+        EOF
+
+        cmake -B build -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/dist
+
+        cmake --build build
