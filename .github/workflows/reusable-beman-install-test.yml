@@ -26,7 +26,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Configure CMake (Library)
-      run:  |
+      run: |
         mkdir -p build/.cmake/api/v1/query
         touch build/.cmake/api/v1/query/codemodel-v2
         cmake -B build -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=./infra/cmake/use-fetch-content.cmake -DCMAKE_CXX_STANDARD=${{ inputs.cxx_standard }} -DCMAKE_INSTALL_PREFIX=$PWD/dist
