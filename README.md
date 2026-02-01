@@ -83,3 +83,7 @@ requests and on push.
 This provides a workflow for checking consistency of
 [`beman-submodule`](https://github.com/bemanproject/infra/blob/main/tools/beman-submodule/README.md)
 directories used by Beman repositories to deduplicate infrastructure.
+
+## `reusable-beman-clang-tidy.yml`
+
+This provides a workflow for running clang-tidy on the `build` directory where it is expected to find the `compile_commands.json` file.
