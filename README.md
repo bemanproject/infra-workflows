@@ -87,3 +87,18 @@ directories used by Beman repositories to deduplicate infrastructure.
 ## `reusable-beman-clang-tidy.yml`
 
 This provides a workflow for running clang-tidy on the `build` directory where it is expected to find the `compile_commands.json` file.
+
+Provides a reusable workflow that runs `clang-tidy` inside the `ghcr.io/bemanproject/infra-containers-clang:latest` container. It accepts a JSON `matrix_config` input (fields: `options`, `files`, `upload_results`, `continue_on_error`):
+
+```json
+[
+  {"options": "", "files": "examples", "upload_results": false},
+  {"options": "-checks='-*,bugprone-*'", "files": "examples", "upload_results": false},
+]
+```
+- `options`: These are command line options directly passed to `run-clang-tidy`.<br>The workflow itself will append `-p <build dir>` so it is not recommended to manually pass `-p <build dir>`.
+- `files`: This can be a directory or files or a path containing wildcards which are passed to `run-clang-tidy`.
+- `upload_results`: If set to true will upload all files matching `build/*.yaml` to the current workflow run.
+- `continue_on_error`: If set to true the clang-tidy check will not fail. If not specified automatically set to true.
+
+It then configures CMake to export `compile_commands.json` into a build directory, runs `run-clang-tidy` against that build tree, and can optionally upload YAML results as an artifact.
