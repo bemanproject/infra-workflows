@@ -11,7 +11,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install beman-submodule
-        run: pip install beman-submodule
+        run: pip install git+https://github.com/bemanproject/beman-submodule.git
       - name: beman submodule consistency check
         run: |
           (set -eo pipefail; while read line ; do echo $line | grep -qvF '+' ; done < <(beman-submodule status))
