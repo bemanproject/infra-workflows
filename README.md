@@ -81,5 +81,5 @@ requests and on push.
 ## `reusable-beman-submodule-check.yml`
 
 This provides a workflow for checking consistency of
-[`beman-submodule`](https://github.com/bemanproject/infra/blob/main/tools/beman-submodule/README.md)
+[`beman-submodule`](https://github.com/bemanproject/beman-submodule)
 directories used by Beman repositories to deduplicate infrastructure.
