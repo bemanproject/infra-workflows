@@ -3,11 +3,6 @@
 name: 'beman-submodule check'
 on:
   workflow_call:
-    inputs:
-      infra_path:
-        description: "Path to the infra beman-submodule"
-        type: string
-        default: './infra/'
 jobs:
   check:
     name: Check beman submodules for consistency
@@ -15,6 +10,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install beman-submodule
+        run: pip install beman-submodule
       - name: beman submodule consistency check
         run: |
-          (set -eo pipefail; while read line ; do echo $line | grep -qvF '+' ; done < <(${{ inputs.infra_path }}/tools/beman-submodule/beman-submodule status))
+          (set -eo pipefail; while read line ; do echo $line | grep -qvF '+' ; done < <(beman-submodule status))
