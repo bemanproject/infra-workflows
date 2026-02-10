@@ -27,5 +27,7 @@ jobs:
         uses: TheMrMilchmann/setup-msvc-dev@v3
         with:
           arch: x64
-      - name: Run preset
+      - name: Configure preset verbose
+        run: cmake --preset ${{ matrix.presets.preset }} --log-level=VERBOSE
+      - name: Run workflow preset
         run: cmake --workflow --preset ${{ matrix.presets.preset }}
