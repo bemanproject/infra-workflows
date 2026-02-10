@@ -77,6 +77,9 @@ jobs:
         if: matrix.config.compiler == 'appleclang'
         shell: bash
         run: sudo chmod -R 777 /opt/
+      - name: Setup latest CMake and Ninja
+        if: matrix.config.compiler == 'msvc' || matrix.config.compiler == 'appleclang'
+        uses: lukka/get-cmake@latest
       - name: Print installed software
         shell: bash
         run: |

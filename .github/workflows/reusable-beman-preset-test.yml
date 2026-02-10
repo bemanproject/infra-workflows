@@ -22,9 +22,6 @@ jobs:
       - name: Setup build environment
         if: matrix.presets.runner
         uses: lukka/get-cmake@latest
-        with:
-          cmakeVersion: "4.2.2"
-          ninjaVersion: "1.13.0"
       - name: Setup MSVC
         if: startsWith(matrix.presets.runner, 'windows')
         uses: TheMrMilchmann/setup-msvc-dev@v3
