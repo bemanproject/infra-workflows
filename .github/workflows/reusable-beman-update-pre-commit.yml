@@ -6,11 +6,12 @@ on:
   workflow_call:
     secrets:
       APP_ID:
-        required: true
+        required: false
       PRIVATE_KEY:
-        required: true
+        required: false
 jobs:
   auto-update:
+    if: github.repository_owner == 'bemanproject'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
