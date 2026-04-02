@@ -27,9 +27,6 @@ jobs:
 
     permissions:
       contents: read
-      checks: write
-      issues: write
-      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -50,7 +47,36 @@ jobs:
       - uses: pre-commit/action@v3.0.1
         id: run-pre-commit
 
-        # Review dog posts the suggested change from pre-commit to the pr.
+  # Reviewdog posts suggested changes from pre-commit to the PR.
+  # Requires write permissions only available within the bemanproject org.
+  pre-commit-pr-reviewdog:
+    name: Pre-Commit reviewdog suggestions
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request_target' && github.repository_owner == 'bemanproject' }}
+
+    permissions:
+      contents: read
+      checks: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout pr
+        run: gh pr checkout ${{ github.event.number }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.13
+
+      - uses: pre-commit/action@v3.0.1
+        id: run-pre-commit
+
       - name: suggester / pre-commit
         uses: reviewdog/action-suggester@v1
         if: ${{ failure() && steps.run-pre-commit.conclusion == 'failure' }}
