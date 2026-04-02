@@ -48,6 +48,7 @@ jobs:
           python-version: 3.13
 
       - uses: pre-commit/action@v3.0.1
+        id: run-pre-commit
 
         # Review dog posts the suggested change from pre-commit to the pr.
       - name: suggester / pre-commit
