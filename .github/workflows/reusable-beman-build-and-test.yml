@@ -169,8 +169,15 @@ jobs:
           git config --global --add safe.directory $GITHUB_WORKSPACE
           gcovr --verbose --config gcovr.cfg .
           cat coverage.json
-      - name: Upload Coverage Data to Coveralls
+      - name: Check if coverage data is empty
         if: steps.vars.outputs.test_type == 'Coverage' && github.event_name != 'schedule'
+        id: coverage_check
+        run: |
+          if jq -e '.source_files | length > 0' coverage.json > /dev/null 2>&1; then
+            echo "has_data=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload Coverage Data to Coveralls
+        if: steps.coverage_check.outputs.has_data == 'true'
         uses: coverallsapp/github-action@main
         with:
           file: coverage.json
