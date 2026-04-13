@@ -18,7 +18,7 @@ jobs:
     runs-on: ${{ matrix.presets.runner || 'ubuntu-latest' }}
     container: ${{ matrix.presets.image }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup build environment
         if: matrix.presets.runner
         uses: lukka/get-cmake@latest
