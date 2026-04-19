@@ -18,7 +18,13 @@ jobs:
         with:
           python-version: 3.13
 
-      - uses: pre-commit/action@v3.0.1
+      - uses: actions/cache@v5
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Run pre-commit
+        run: pip install pre-commit && pre-commit run --all-files
 
   pre-commit-pr:
     name: Pre-Commit check on PR
@@ -47,8 +53,14 @@ jobs:
         with:
           python-version: 3.13
 
-      - uses: pre-commit/action@v3.0.1
+      - uses: actions/cache@v5
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Run pre-commit
         id: run-pre-commit
+        run: pip install pre-commit && pre-commit run --all-files
 
         # Review dog posts the suggested change from pre-commit to the pr.
       - name: suggester / pre-commit
