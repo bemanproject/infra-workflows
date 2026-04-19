@@ -70,7 +70,7 @@ jobs:
           submodules: 'recursive'
       - name: Setup MSVC
         if: matrix.config.compiler == 'msvc'
-        uses: TheMrMilchmann/setup-msvc-dev@v3
+        uses: TheMrMilchmann/setup-msvc-dev@v4
         with:
           arch: x64
       - name: Setup Macos

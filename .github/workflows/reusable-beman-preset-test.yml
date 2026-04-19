@@ -24,7 +24,7 @@ jobs:
         uses: lukka/get-cmake@latest
       - name: Setup MSVC
         if: startsWith(matrix.presets.runner, 'windows')
-        uses: TheMrMilchmann/setup-msvc-dev@v3
+        uses: TheMrMilchmann/setup-msvc-dev@v4
         with:
           arch: x64
       - name: Configure preset verbose
