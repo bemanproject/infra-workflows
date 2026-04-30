@@ -1,0 +1,132 @@
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: 'Beman vcpkg CI'
+on:
+  workflow_call:
+    inputs:
+      port_name:
+        description: 'vcpkg port name (e.g. beman-transform-view)'
+        type: string
+        required: true
+
+jobs:
+  vcpkg-port-install:
+    name: Test port templates
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bemanproject/infra-containers-gcc:latest
+    env:
+      VCPKG_ROOT: /usr/local/share/vcpkg
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v6
+
+      - name: Install vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh"
+
+      - name: Validate port templates exist
+        run: |
+          if [ ! -f port/vcpkg.json.in ] || [ ! -f port/portfile.cmake.in ]; then
+            echo "::error::Missing port/vcpkg.json.in or port/portfile.cmake.in"
+            exit 1
+          fi
+
+      - name: Build overlay port from templates
+        run: |
+          PORT_NAME="${{ inputs.port_name }}"
+          OVERLAY_DIR="${RUNNER_TEMP}/overlay-ports/${PORT_NAME}"
+          mkdir -p "${OVERLAY_DIR}"
+
+          # Render vcpkg.json.in with a dummy version
+          sed -e 's/@VERSION@/0.0.0/g' port/vcpkg.json.in > "${OVERLAY_DIR}/vcpkg.json"
+
+          # Generate a portfile that replaces vcpkg_from_github with a local source path.
+          # Use awk to skip the vcpkg_from_github(...) block and prepend a set(SOURCE_PATH ...).
+          awk '
+            /vcpkg_from_github\(/ { skip=1 }
+            skip && /\)/ { skip=0; next }
+            skip { next }
+            { print }
+          ' port/portfile.cmake.in \
+            | sed 's/@VERSION@/0.0.0/g; s/@SHA512@/0/g' > "${RUNNER_TEMP}/portfile_body.cmake"
+
+          printf 'set(SOURCE_PATH "%s")\n' "${GITHUB_WORKSPACE}" > "${OVERLAY_DIR}/portfile.cmake"
+          cat "${RUNNER_TEMP}/portfile_body.cmake" >> "${OVERLAY_DIR}/portfile.cmake"
+
+          # Copy any additional port files (patches, usage, etc.)
+          for f in port/*; do
+            basename="$(basename "$f")"
+            case "${basename}" in
+              *.in) ;;
+              *) cp "$f" "${OVERLAY_DIR}/" ;;
+            esac
+          done
+
+          echo "::group::Overlay vcpkg.json"
+          cat "${OVERLAY_DIR}/vcpkg.json"
+          echo "::endgroup::"
+          echo "::group::Overlay portfile.cmake"
+          cat "${OVERLAY_DIR}/portfile.cmake"
+          echo "::endgroup::"
+
+      - name: Install port via manifest with overlay
+        working-directory: ${{ runner.temp }}
+        run: |
+          PORT_NAME="${{ inputs.port_name }}"
+          OVERLAY_DIR="${RUNNER_TEMP}/overlay-ports/${PORT_NAME}"
+
+          # Create a temporary manifest that depends on the port under test
+          mkdir -p port-test && cd port-test
+          cat > vcpkg.json <<MANIFEST_EOF
+          {
+            "name": "port-test",
+            "version": "0.0.0",
+            "dependencies": ["${PORT_NAME}"]
+          }
+          MANIFEST_EOF
+
+          # Copy vcpkg-configuration.json so vcpkg can resolve registry dependencies
+          if [ -f "${GITHUB_WORKSPACE}/vcpkg-configuration.json" ]; then
+            cp "${GITHUB_WORKSPACE}/vcpkg-configuration.json" .
+          fi
+
+          "$VCPKG_ROOT/vcpkg" install \
+            --overlay-ports="${OVERLAY_DIR}"
+
+  vcpkg-developer-build:
+    name: Test developer build with vcpkg
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bemanproject/infra-containers-gcc:latest
+    env:
+      VCPKG_ROOT: /usr/local/share/vcpkg
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v6
+
+      - name: Validate vcpkg manifest exists
+        run: |
+          if [ ! -f vcpkg.json ] || [ ! -f vcpkg-configuration.json ]; then
+            echo "::error::Missing vcpkg.json or vcpkg-configuration.json"
+            exit 1
+          fi
+
+      - name: Install vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh"
+
+      - name: Configure with vcpkg
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DCMAKE_CXX_STANDARD=23 \
+            -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
