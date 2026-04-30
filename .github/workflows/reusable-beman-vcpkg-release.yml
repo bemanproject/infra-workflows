@@ -1,0 +1,145 @@
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: 'Beman vcpkg registry release'
+on:
+  workflow_call:
+    inputs:
+      port_name:
+        description: 'vcpkg port name (e.g. beman-transform-view)'
+        type: string
+        required: true
+    secrets:
+      VCPKG_REGISTRY_TOKEN:
+        description: 'PAT or token with push access to the vcpkg registry repository'
+        required: true
+
+jobs:
+  update-registry:
+    name: Update vcpkg registry
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v6
+
+      - name: Validate port templates exist
+        run: |
+          if [ ! -f port/vcpkg.json.in ] || [ ! -f port/portfile.cmake.in ]; then
+            echo "::error::Missing port/vcpkg.json.in or port/portfile.cmake.in"
+            exit 1
+          fi
+
+      - name: Determine version from release tag
+        id: version
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Download release tarball and compute SHA512
+        id: sha
+        run: |
+          TARBALL_URL="https://github.com/${{ github.repository }}/archive/${{ steps.version.outputs.tag }}.tar.gz"
+          echo "Downloading ${TARBALL_URL}"
+          SHA512=$(curl -sL "${TARBALL_URL}" | sha512sum | awk '{print $1}')
+          echo "sha512=${SHA512}" >> "$GITHUB_OUTPUT"
+
+      - name: Render port templates
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA512="${{ steps.sha.outputs.sha512 }}"
+
+          mkdir -p rendered-port
+          sed -e "s|@VERSION@|${VERSION}|g" -e "s|@SHA512@|${SHA512}|g" \
+            port/vcpkg.json.in > rendered-port/vcpkg.json
+          sed -e "s|@VERSION@|${VERSION}|g" -e "s|@SHA512@|${SHA512}|g" \
+            port/portfile.cmake.in > rendered-port/portfile.cmake
+
+          # Copy any additional port files (usage, patches, etc.)
+          for f in port/*; do
+            basename="$(basename "$f")"
+            case "${basename}" in
+              *.in) ;;
+              *) cp "$f" rendered-port/ ;;
+            esac
+          done
+
+          echo "::group::Rendered vcpkg.json"
+          cat rendered-port/vcpkg.json
+          echo "::endgroup::"
+          echo "::group::Rendered portfile.cmake"
+          cat rendered-port/portfile.cmake
+          echo "::endgroup::"
+
+      - name: Checkout vcpkg registry
+        uses: actions/checkout@v6
+        with:
+          repository: bemanproject/vcpkg-registry
+          token: ${{ secrets.VCPKG_REGISTRY_TOKEN }}
+          path: vcpkg-registry
+
+      - name: Update registry port
+        working-directory: vcpkg-registry
+        run: |
+          PORT_NAME="${{ inputs.port_name }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          PORT_DIR="ports/${PORT_NAME}"
+
+          mkdir -p "${PORT_DIR}"
+          cp ../rendered-port/* "${PORT_DIR}/"
+
+      - name: Update versions and baseline
+        working-directory: vcpkg-registry
+        run: |
+          PORT_NAME="${{ inputs.port_name }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          PORT_DIR="ports/${PORT_NAME}"
+          VERSION_PREFIX="${PORT_NAME:0:1}-"
+          VERSION_FILE="versions/${VERSION_PREFIX}/${PORT_NAME}.json"
+
+          # Compute the git-tree SHA for the port directory
+          git add "${PORT_DIR}"
+          GIT_TREE=$(git write-tree --prefix="${PORT_DIR}")
+
+          # Update or create the version file
+          mkdir -p "versions/${VERSION_PREFIX}"
+          if [ -f "${VERSION_FILE}" ]; then
+            VERSIONS=$(cat "${VERSION_FILE}")
+          else
+            VERSIONS='{"versions":[]}'
+          fi
+
+          NEW_ENTRY=$(jq -n \
+            --arg gt "${GIT_TREE}" \
+            --arg ver "${VERSION}" \
+            '{"git-tree": $gt, "version-semver": $ver, "port-version": 0}')
+
+          echo "${VERSIONS}" | jq \
+            --argjson entry "${NEW_ENTRY}" \
+            '.versions = [$entry] + .versions' \
+            > "${VERSION_FILE}"
+
+          # Update baseline.json
+          if [ ! -f versions/baseline.json ]; then
+            echo '{"default":{}}' > versions/baseline.json
+          fi
+
+          jq \
+            --arg port "${PORT_NAME}" \
+            --arg ver "${VERSION}" \
+            '.default[$port] = {"baseline": $ver, "port-version": 0}' \
+            versions/baseline.json > versions/baseline.json.tmp
+          mv versions/baseline.json.tmp versions/baseline.json
+
+      - name: Commit and push
+        working-directory: vcpkg-registry
+        run: |
+          PORT_NAME="${{ inputs.port_name }}"
+          VERSION="${{ steps.version.outputs.version }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Update ${PORT_NAME} to ${VERSION}"
+          git push
