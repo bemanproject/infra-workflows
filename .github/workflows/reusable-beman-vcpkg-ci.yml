@@ -8,13 +8,17 @@ on:
         description: 'vcpkg port name (e.g. beman-transform-view)'
         type: string
         required: true
+      container_image:
+        description: 'Container image to use for CI jobs'
+        type: string
+        default: 'ghcr.io/bemanproject/infra-containers-gcc:latest'
 
 jobs:
   vcpkg-port-install:
     name: Test port templates
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/bemanproject/infra-containers-gcc:latest
+      image: ${{ inputs.container_image }}
     env:
       VCPKG_ROOT: /usr/local/share/vcpkg
     steps:
@@ -99,7 +103,7 @@ jobs:
     name: Test developer build with vcpkg
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/bemanproject/infra-containers-gcc:latest
+      image: ${{ inputs.container_image }}
     env:
       VCPKG_ROOT: /usr/local/share/vcpkg
     steps:
