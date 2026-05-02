@@ -12,11 +12,40 @@ on:
         description: 'Container image to use for CI jobs'
         type: string
         default: 'ghcr.io/bemanproject/infra-containers-gcc:latest'
+      feature_combinations:
+        description: |
+          JSON array of vcpkg feature combinations to test in the port-install
+          matrix. Each entry has the shape:
+            {"features": {"<feature-name>": true | false, ...}}
+          true features are enabled in the install set. false features are
+          explicitly excluded; whenever any feature is false, default-features
+          are suppressed in the test manifest so the assertion is meaningful
+          even for features that ship in the port's default-features list.
+          The default value runs a single combination with the port's
+          default features only.
+        type: string
+        default: '[{"features":{}}]'
 
 jobs:
-  vcpkg-port-install:
-    name: Test port templates
+  compute-port-install-matrix:
     runs-on: ubuntu-latest
+    outputs:
+      entries: ${{ steps.gen.outputs.entries }}
+    steps:
+      - id: gen
+        env:
+          INPUT: ${{ inputs.feature_combinations }}
+        run: |
+          echo "entries=$(jq -c 'map({label: (.features|tostring), combo: .})' <<<"$INPUT")" >> "$GITHUB_OUTPUT"
+
+  vcpkg-port-install:
+    name: Test port templates ${{ matrix.entry.label }}
+    needs: compute-port-install-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        entry: ${{ fromJSON(needs.compute-port-install-matrix.outputs.entries) }}
     container:
       image: ${{ inputs.container_image }}
     env:
@@ -77,19 +106,33 @@ jobs:
 
       - name: Install port via manifest with overlay
         working-directory: ${{ runner.temp }}
+        env:
+          PORT_NAME: ${{ inputs.port_name }}
+          COMBO_JSON: ${{ toJSON(matrix.entry.combo) }}
         run: |
-          PORT_NAME="${{ inputs.port_name }}"
           OVERLAY_DIR="${RUNNER_TEMP}/overlay-ports/${PORT_NAME}"
 
-          # Create a temporary manifest that depends on the port under test
+          # Build the dependency entry from the combo's true/false feature toggles.
+          ON_FEATURES=$(jq -c '[(.features // {}) | to_entries[] | select(.value == true) | .key]' <<< "$COMBO_JSON")
+          OFF_COUNT=$(jq '[(.features // {}) | to_entries[] | select(.value == false)] | length' <<< "$COMBO_JSON")
+
+          if [ "$OFF_COUNT" -gt 0 ]; then
+            DEP=$(jq -n --arg name "$PORT_NAME" --argjson feats "$ON_FEATURES" \
+              '{name: $name, "default-features": false, features: $feats}')
+          elif [ "$ON_FEATURES" != "[]" ]; then
+            DEP=$(jq -n --arg name "$PORT_NAME" --argjson feats "$ON_FEATURES" \
+              '{name: $name, features: $feats}')
+          else
+            DEP=$(jq -n --arg name "$PORT_NAME" '$name')
+          fi
+
           mkdir -p port-test && cd port-test
-          cat > vcpkg.json <<MANIFEST_EOF
-          {
-            "name": "port-test",
-            "version": "0.0.0",
-            "dependencies": ["${PORT_NAME}"]
-          }
-          MANIFEST_EOF
+          jq -n --argjson dep "$DEP" \
+            '{name: "port-test", version: "0.0.0", dependencies: [$dep]}' > vcpkg.json
+
+          echo "::group::Test manifest"
+          cat vcpkg.json
+          echo "::endgroup::"
 
           # Copy vcpkg-configuration.json so vcpkg can resolve registry dependencies
           if [ -f "${GITHUB_WORKSPACE}/vcpkg-configuration.json" ]; then
