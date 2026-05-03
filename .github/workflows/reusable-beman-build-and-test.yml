@@ -146,7 +146,20 @@ jobs:
         shell: bash
         run: |
           cmake --build build --config ${{ steps.vars.outputs.build_config }} --parallel --verbose
-          cmake --build build --config ${{ steps.vars.outputs.build_config }} --target all_verify_interface_header_sets
+
+          # The all_verify_interface_header_sets meta-target only exists when at
+          # least one target enables VERIFY_INTERFACE_HEADER_SETS. Configurations
+          # that ship a library purely as a C++ module won't generate it; treat
+          # ninja's "unknown target" as a no-op rather than a failure.
+          verify_log=$(mktemp)
+          if cmake --build build --config ${{ steps.vars.outputs.build_config }} --target all_verify_interface_header_sets 2>&1 | tee "$verify_log"; then
+            :
+          elif grep -q "unknown target.*all_verify_interface_header_sets" "$verify_log"; then
+            echo "::notice::No interface header sets to verify in this configuration; skipping."
+          else
+            exit 1
+          fi
+
           cmake --install build --config ${{ steps.vars.outputs.build_config }} --prefix /opt/beman.package
           ls -R /opt/beman.package
       - name: Test
