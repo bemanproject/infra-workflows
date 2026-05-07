@@ -178,6 +178,8 @@ jobs:
           coveralls = $GITHUB_WORKSPACE/coverage.json
           coveralls-pretty = yes
           merge-mode-functions = separate
+          gcov-ignore-parse-errors = suspicious_hits.warn_once_per_file
+          gcov-ignore-parse-errors = negative_hits.warn_once_per_file
           EOF
           git config --global --add safe.directory $GITHUB_WORKSPACE
           gcovr --verbose --config gcovr.cfg .
