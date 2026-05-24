@@ -80,6 +80,8 @@ jobs:
       - name: Setup latest CMake and Ninja
         if: matrix.config.compiler == 'msvc' || matrix.config.compiler == 'appleclang'
         uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: 4.3.3
       - name: Print installed software
         shell: bash
         run: |
