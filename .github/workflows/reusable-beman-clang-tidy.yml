@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: 'Beman clang-tidy run matrix'
+on:
+  workflow_call:
+    inputs:
+      matrix_config:
+        description: 'JSON array of {"options":"", "files":"", "upload_results": false, "continue_on_error": true} objects'
+        type: string
+        required: true
+jobs:
+  clang_tidy_matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        clang_tidy_args: ${{ fromJSON(inputs.matrix_config) }}
+    name: "clang-tidy on infra-containers-clang:latest"
+    runs-on: ubuntu-latest
+    container: ghcr.io/bemanproject/infra-containers-clang:latest
+    env:
+      CXX: /usr/local/bin/clang++
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Config cmake
+        run: |
+          cmake -B build -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: clang-tidy ${{ matrix.clang_tidy_args.files }}
+        continue-on-error: ${{ matrix.clang_tidy_args.continue_on_error || true }}
+        run: |
+          run-clang-tidy -p build ${{ matrix.clang_tidy_args.options }} ${{ matrix.clang_tidy_args.files }}
+
+      - name: Upload clang-tidy results
+        if: ${{ matrix.clang_tidy_args.upload_results || false }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-results
+          path: ${{env.BUILD_DIR}}/*.yaml
+          if-no-files-found: warn
