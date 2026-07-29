@@ -50,13 +50,27 @@ jobs:
       image: ${{ inputs.container_image }}
     env:
       VCPKG_ROOT: /usr/local/share/vcpkg
+      # Use the CMake/Ninja the container image pins instead of letting vcpkg
+      # download whatever scripts/vcpkg-tools.json names. Beman's
+      # infra/cmake/enable-experimental-import-std.cmake maps a fixed set of
+      # CMake versions to CMAKE_EXPERIMENTAL_CXX_IMPORT_STD UUIDs, so an
+      # unpinned CMake silently breaks the `modules` feature combinations.
+      VCPKG_FORCE_SYSTEM_BINARIES: 1
     steps:
       - name: Checkout source repository
         uses: actions/checkout@v6
 
       - name: Install vcpkg
         run: |
-          git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+          # Check out the same commit the port baseline pins, so the tool
+          # versions vcpkg selects come from that commit's
+          # scripts/vcpkg-tools.json rather than from master.
+          VCPKG_COMMIT=$(jq -r '.["default-registry"].baseline' vcpkg-configuration.json)
+          echo "Pinning vcpkg to ${VCPKG_COMMIT}"
+          git init -q "$VCPKG_ROOT"
+          git -C "$VCPKG_ROOT" remote add origin https://github.com/microsoft/vcpkg.git
+          git -C "$VCPKG_ROOT" fetch -q --depth 1 origin "$VCPKG_COMMIT"
+          git -C "$VCPKG_ROOT" checkout -q --detach FETCH_HEAD
           "$VCPKG_ROOT/bootstrap-vcpkg.sh"
 
       - name: Validate port templates exist
@@ -149,6 +163,8 @@ jobs:
       image: ${{ inputs.container_image }}
     env:
       VCPKG_ROOT: /usr/local/share/vcpkg
+      # See the note on the vcpkg-port-install job.
+      VCPKG_FORCE_SYSTEM_BINARIES: 1
     steps:
       - name: Checkout source repository
         uses: actions/checkout@v6
@@ -162,7 +178,13 @@ jobs:
 
       - name: Install vcpkg
         run: |
-          git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+          # See the note on the vcpkg-port-install job.
+          VCPKG_COMMIT=$(jq -r '.["default-registry"].baseline' vcpkg-configuration.json)
+          echo "Pinning vcpkg to ${VCPKG_COMMIT}"
+          git init -q "$VCPKG_ROOT"
+          git -C "$VCPKG_ROOT" remote add origin https://github.com/microsoft/vcpkg.git
+          git -C "$VCPKG_ROOT" fetch -q --depth 1 origin "$VCPKG_COMMIT"
+          git -C "$VCPKG_ROOT" checkout -q --detach FETCH_HEAD
           "$VCPKG_ROOT/bootstrap-vcpkg.sh"
 
       - name: Configure with vcpkg
