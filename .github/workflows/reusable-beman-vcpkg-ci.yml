@@ -58,7 +58,7 @@ jobs:
       VCPKG_FORCE_SYSTEM_BINARIES: 1
     steps:
       - name: Checkout source repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Install vcpkg
         run: |
@@ -167,7 +167,7 @@ jobs:
       VCPKG_FORCE_SYSTEM_BINARIES: 1
     steps:
       - name: Checkout source repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Validate vcpkg manifest exists
         run: |
