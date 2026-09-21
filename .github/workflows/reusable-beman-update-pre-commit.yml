@@ -28,7 +28,7 @@ jobs:
       - name: Install pre-commit
         run: pip install pre-commit
       - name: Run pre-commit autoupdate
-        run: pre-commit autoupdate
+        run: pre-commit autoupdate --freeze
       - name: Apply updated hooks to all files
         run: pre-commit run --all-files
         continue-on-error: true
