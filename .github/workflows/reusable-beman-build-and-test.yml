@@ -62,7 +62,17 @@ jobs:
       ${{ (matrix.config.compiler == 'gcc' || startsWith(matrix.config.compiler, 'clang')) && 'ubuntu-latest'
           || (matrix.config.compiler == 'appleclang' && 'macos-latest')
           || (matrix.config.compiler == 'msvc' && 'windows-latest') }}
-    container: ${{ matrix.config.image }}
+    # Rows without an image (appleclang, msvc) evaluate `image` to '', which the
+    # runner treats as "no job container", so those rows still run on the host.
+    #
+    # TSan re-execs itself with ASLR disabled when the address space layout is
+    # incompatible (as happens on ubuntu-26.04 runners), which needs
+    # personality(ADDR_NO_RANDOMIZE). Docker's default seccomp profile blocks
+    # that, so TSan containers run without the seccomp filter. See
+    # bemanproject/infra-workflows#44.
+    container:
+      image: ${{ matrix.config.image }}
+      options: ${{ endsWith(matrix.config.test, '.TSan') && '--security-opt seccomp=unconfined' || '' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
